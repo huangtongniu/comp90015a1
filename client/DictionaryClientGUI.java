@@ -5,6 +5,8 @@ import protocol.Message;
 import javax.swing.*;
 import javax.swing.border.TitledBorder;
 import java.awt.*;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
@@ -12,13 +14,20 @@ import java.net.Socket;
 import java.util.Arrays;
 import java.util.List;
 
+/**
+ * ~ Dictionary Client GUI ~
+ * Integrated with socket communication and protocol implementation.
+ * 
+ * @author [Student Name]
+ * Student ID: [Student ID]
+ */
 public class DictionaryClientGUI extends JFrame {
 
     // Connection configuration
     private String serverAddress;
     private int port;
     private int sleepDuration;
-    
+
     // Socket communication
     private Socket socket;
     private ObjectOutputStream out;
@@ -36,6 +45,9 @@ public class DictionaryClientGUI extends JFrame {
     private JButton addMeaningButton;
     private JButton updateMeaningButton;
     private JLabel statusLabel;
+
+    // Connection status
+    private boolean isConnected = false;
 
     public DictionaryClientGUI(String serverAddress, int port, int sleepDuration) {
         this.serverAddress = serverAddress;
@@ -101,7 +113,12 @@ public class DictionaryClientGUI extends JFrame {
         panel.add(wordField, BorderLayout.CENTER);
         panel.add(searchButton, BorderLayout.EAST);
 
-        searchButton.addActionListener(e -> searchWord());
+        searchButton.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                searchWord();
+            }
+        });
 
         return panel;
     }
@@ -112,7 +129,7 @@ public class DictionaryClientGUI extends JFrame {
 
         JPanel inputPanel = new JPanel(new GridLayout(3, 2, 5, 5));
 
-        JTextField addWordField = new JTextField();
+        final JTextField addWordField = new JTextField();
         meaningArea = new JTextArea(3, 20);
         meaningArea.setLineWrap(true);
         meaningArea.setWrapStyleWord(true);
@@ -129,7 +146,12 @@ public class DictionaryClientGUI extends JFrame {
 
         panel.add(inputPanel, BorderLayout.CENTER);
 
-        addWordButton.addActionListener(e -> addWord(addWordField.getText(), meaningArea.getText()));
+        addWordButton.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                addWord(addWordField.getText(), meaningArea.getText());
+            }
+        });
 
         return panel;
     }
@@ -138,14 +160,19 @@ public class DictionaryClientGUI extends JFrame {
         JPanel panel = new JPanel(new BorderLayout());
         panel.setBorder(new TitledBorder("Remove Word"));
 
-        JTextField removeWordField = new JTextField();
+        final JTextField removeWordField = new JTextField();
         removeWordButton = new JButton("Remove");
 
         panel.add(new JLabel("Word:"), BorderLayout.WEST);
         panel.add(removeWordField, BorderLayout.CENTER);
         panel.add(removeWordButton, BorderLayout.EAST);
 
-        removeWordButton.addActionListener(e -> removeWord(removeWordField.getText()));
+        removeWordButton.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                removeWord(removeWordField.getText());
+            }
+        });
 
         return panel;
     }
@@ -156,7 +183,7 @@ public class DictionaryClientGUI extends JFrame {
 
         JPanel operationsPanel = new JPanel(new GridLayout(3, 2, 5, 5));
 
-        JTextField updateWordField = new JTextField();
+        final JTextField updateWordField = new JTextField();
         existingMeaningField = new JTextField();
         newMeaningField = new JTextField();
 
@@ -177,11 +204,21 @@ public class DictionaryClientGUI extends JFrame {
         panel.add(operationsPanel, BorderLayout.CENTER);
         panel.add(buttonPanel, BorderLayout.SOUTH);
 
-        addMeaningButton.addActionListener(e -> addMeaning(updateWordField.getText(), newMeaningField.getText()));
+        addMeaningButton.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                addMeaning(updateWordField.getText(), newMeaningField.getText());
+            }
+        });
 
-        updateMeaningButton.addActionListener(e -> updateMeaning(updateWordField.getText(),
-                existingMeaningField.getText(),
-                newMeaningField.getText()));
+        updateMeaningButton.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                updateMeaning(updateWordField.getText(),
+                        existingMeaningField.getText(),
+                        newMeaningField.getText());
+            }
+        });
 
         return panel;
     }
@@ -201,56 +238,76 @@ public class DictionaryClientGUI extends JFrame {
         return panel;
     }
 
+    /**
+     * Connection logic
+     */
     private void connectToServer() {
-        new Thread(() -> {
-            try {
-                socket = new Socket(serverAddress, port);
-                out = new ObjectOutputStream(socket.getOutputStream());
-                in = new ObjectInputStream(socket.getInputStream());
-                setConnectionStatus(true);
-                displayResult("Connected to " + serverAddress + ":" + port);
-            } catch (IOException e) {
-                setConnectionStatus(false);
-                displayResult("Error: Could not connect to server - " + e.getMessage());
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    socket = new Socket(serverAddress, port);
+                    out = new ObjectOutputStream(socket.getOutputStream());
+                    in = new ObjectInputStream(socket.getInputStream());
+                    setConnectionStatus(true);
+                    displayResult("Connected to " + serverAddress + ":" + port);
+                } catch (IOException e) {
+                    setConnectionStatus(false);
+                    displayResult("Error: Could not connect to server - " + e.getMessage());
+                }
             }
         }).start();
     }
 
-    private void sendMessage(Message msg) {
+    /**
+     * Shared method to send messages to the server
+     */
+    private void sendMessage(final Message msg) {
         if (socket == null || socket.isClosed()) {
             displayResult("Error: Not connected to server.");
             return;
         }
-        new Thread(() -> {
-            try {
-                out.writeObject(msg);
-                out.flush();
-                Message response = (Message) in.readObject();
-                handleResponse(response);
-            } catch (IOException | ClassNotFoundException e) {
-                displayResult("Error: Communication failure - " + e.getMessage());
-                setConnectionStatus(false);
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    out.writeObject(msg);
+                    out.flush();
+                    final Message response = (Message) in.readObject();
+                    
+                    // Update UI on Event Dispatch Thread
+                    SwingUtilities.invokeLater(new Runnable() {
+                        @Override
+                        public void run() {
+                            handleResponse(response);
+                        }
+                    });
+                } catch (IOException | ClassNotFoundException e) {
+                    displayResult("Error: Communication failure - " + e.getMessage());
+                    setConnectionStatus(false);
+                }
             }
         }).start();
     }
 
     private void handleResponse(Message response) {
-        SwingUtilities.invokeLater(() -> {
-            if (response.isSuccess()) {
-                if (response.getOperation() == Message.Operation.QUERY) {
-                    displayResult("Found meanings for [" + response.getWord() + "]:");
-                    for (String m : response.getMeanings()) {
-                        displayResult(" - " + m);
-                    }
-                } else {
-                    displayResult(response.getResponseMessage());
+        if (response.isSuccess()) {
+            if (response.getOperation() == Message.Operation.QUERY) {
+                displayResult("Found meanings for [" + response.getWord() + "]:");
+                for (String m : response.getMeanings()) {
+                    displayResult(" - " + m);
                 }
             } else {
-                displayResult("Error: " + response.getResponseMessage());
+                displayResult(response.getResponseMessage());
             }
-        });
+        } else {
+            displayResult("Error: " + response.getResponseMessage());
+        }
     }
 
+    /**
+     * Search for a word in the dictionary
+     */
     private void searchWord() {
         String word = wordField.getText().trim();
         if (word.isEmpty()) {
@@ -260,6 +317,9 @@ public class DictionaryClientGUI extends JFrame {
         sendMessage(Message.query(word, sleepDuration));
     }
 
+    /**
+     * Add a new word with meanings to the dictionary
+     */
     private void addWord(String word, String meanings) {
         if (word.trim().isEmpty() || meanings.trim().isEmpty()) {
             displayResult("Error: Both word and meaning(s) are required.");
@@ -269,6 +329,9 @@ public class DictionaryClientGUI extends JFrame {
         sendMessage(Message.add(word, meaningList, sleepDuration));
     }
 
+    /**
+     * Remove a word from the dictionary
+     */
     private void removeWord(String word) {
         if (word.trim().isEmpty()) {
             displayResult("Error: Please enter a word to remove.");
@@ -277,6 +340,9 @@ public class DictionaryClientGUI extends JFrame {
         sendMessage(Message.remove(word, sleepDuration));
     }
 
+    /**
+     * Add a new meaning to an existing word
+     */
     private void addMeaning(String word, String newMeaning) {
         if (word.trim().isEmpty() || newMeaning.trim().isEmpty()) {
             displayResult("Error: Both word and new meaning are required.");
@@ -285,6 +351,9 @@ public class DictionaryClientGUI extends JFrame {
         sendMessage(Message.addMeaning(word, newMeaning, sleepDuration));
     }
 
+    /**
+     * Update an existing meaning of a word
+     */
     private void updateMeaning(String word, String existingMeaning, String newMeaning) {
         if (word.trim().isEmpty() || existingMeaning.trim().isEmpty() || newMeaning.trim().isEmpty()) {
             displayResult("Error: Word, existing meaning, and new meaning are all required.");
@@ -293,47 +362,68 @@ public class DictionaryClientGUI extends JFrame {
         sendMessage(Message.updateMeaning(word, existingMeaning, newMeaning, sleepDuration));
     }
 
-    private void displayResult(String result) {
-        SwingUtilities.invokeLater(() -> {
-            resultArea.append(java.time.LocalTime.now() + ": " + result + "\n");
-            resultArea.setCaretPosition(resultArea.getDocument().getLength());
-        });
-    }
-
-    public void setConnectionStatus(boolean connected) {
-        SwingUtilities.invokeLater(() -> {
-            if (connected) {
-                statusLabel.setText("Connected");
-                statusLabel.setForeground(Color.GREEN);
-            } else {
-                statusLabel.setText("Not Connected");
-                statusLabel.setForeground(Color.RED);
+    /**
+     * Display result in the result area
+     */
+    private void displayResult(final String result) {
+        SwingUtilities.invokeLater(new Runnable() {
+            @Override
+            public void run() {
+                resultArea.append(java.time.LocalTime.now() + ": " + result + "\n");
+                resultArea.setCaretPosition(resultArea.getDocument().getLength());
             }
-            searchButton.setEnabled(connected);
-            addWordButton.setEnabled(connected);
-            removeWordButton.setEnabled(connected);
-            addMeaningButton.setEnabled(connected);
-            updateMeaningButton.setEnabled(connected);
         });
     }
 
+    /**
+     * Update connection status
+     */
+    public void setConnectionStatus(final boolean connected) {
+        this.isConnected = connected;
+        SwingUtilities.invokeLater(new Runnable() {
+            @Override
+            public void run() {
+                if (connected) {
+                    statusLabel.setText("Connected");
+                    statusLabel.setForeground(Color.GREEN);
+                } else {
+                    statusLabel.setText("Not Connected");
+                    statusLabel.setForeground(Color.RED);
+                }
+                searchButton.setEnabled(connected);
+                addWordButton.setEnabled(connected);
+                removeWordButton.setEnabled(connected);
+                addMeaningButton.setEnabled(connected);
+                updateMeaningButton.setEnabled(connected);
+            }
+        });
+    }
+
+    /**
+     * Main method
+     */
     public static void main(String[] args) {
         if (args.length < 3) {
             System.out.println("Usage: java DictionaryClient <server-address> <server-port> <sleep-duration>");
             return;
         }
 
-        String address = args[0];
-        int port = Integer.parseInt(args[1]);
-        int sleep = Integer.parseInt(args[2]);
+        final String address = args[0];
+        final int portNum = Integer.parseInt(args[1]);
+        final int sleep = Integer.parseInt(args[2]);
 
-        SwingUtilities.invokeLater(() -> {
-            try {
-                UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
-            } catch (Exception e) { /* Ignore */ }
+        SwingUtilities.invokeLater(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
+                } catch (Exception e) {
+                    // Default
+                }
 
-            DictionaryClientGUI gui = new DictionaryClientGUI(address, port, sleep);
-            gui.setVisible(true);
+                DictionaryClientGUI gui = new DictionaryClientGUI(address, portNum, sleep);
+                gui.setVisible(true);
+            }
         });
     }
 }
