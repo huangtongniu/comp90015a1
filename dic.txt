@@ -22,4 +22,4 @@ npp : sdsdfsdf
 qwert : keyborad
 helloa : ggggasd
 opop : ppplasd
-hello : sayhi123|sayhi|good
+hello : sayhi123|RE1|good|RE

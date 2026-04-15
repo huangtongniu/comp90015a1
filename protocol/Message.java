@@ -13,13 +13,15 @@ public class Message implements Serializable {
     private Operation operation;
     private String word;
     private List<String> meanings;
-    private String secondaryMeaning; // For update (old meaning)
+    private String secondaryMeaning; // update old meaning
     private int sleepDuration;
     private String responseMessage;
     private boolean success;
 
     // Constructors
-    public Message() {}
+    public Message() {
+
+    }
 
     public static Message query(String word, int sleepDuration) {
         Message msg = new Message();
@@ -50,7 +52,7 @@ public class Message implements Serializable {
         Message msg = new Message();
         msg.operation = Operation.ADD_MEANING;
         msg.word = word;
-        msg.secondaryMeaning = newMeaning; // Reuse field
+        msg.secondaryMeaning = newMeaning; // use to add meaning but not only two meanings limit
         msg.sleepDuration = sleepDuration;
         return msg;
     }
