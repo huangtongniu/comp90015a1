@@ -20,7 +20,6 @@ public class Message implements Serializable {
 
     // Constructors
     public Message() {
-
     }
 
     public static Message query(String word, int sleepDuration) {
@@ -62,7 +61,7 @@ public class Message implements Serializable {
         msg.operation = Operation.UPDATE_MEANING;
         msg.word = word;
         msg.secondaryMeaning = oldMeaning;
-        msg.meanings = List.of(newMeaning); // Use list for the new meaning
+        msg.meanings = List.of(newMeaning); // Use list for the new meaning and put it to the first one
         msg.sleepDuration = sleepDuration;
         return msg;
     }

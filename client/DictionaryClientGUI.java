@@ -307,6 +307,7 @@ public class DictionaryClientGUI extends JFrame {
 
     /**
      * Search for a word in the dictionary
+     * You need to implement this
      */
     private void searchWord() {
         String word = wordField.getText().trim();
@@ -319,6 +320,7 @@ public class DictionaryClientGUI extends JFrame {
 
     /**
      * Add a new word with meanings to the dictionary
+     * You need to implement this
      */
     private void addWord(String word, String meanings) {
         if (word.trim().isEmpty() || meanings.trim().isEmpty()) {
@@ -331,6 +333,7 @@ public class DictionaryClientGUI extends JFrame {
 
     /**
      * Remove a word from the dictionary
+     * You need to implement this
      */
     private void removeWord(String word) {
         if (word.trim().isEmpty()) {
@@ -342,6 +345,7 @@ public class DictionaryClientGUI extends JFrame {
 
     /**
      * Add a new meaning to an existing word
+     * You need to implement this
      */
     private void addMeaning(String word, String newMeaning) {
         if (word.trim().isEmpty() || newMeaning.trim().isEmpty()) {
@@ -353,6 +357,7 @@ public class DictionaryClientGUI extends JFrame {
 
     /**
      * Update an existing meaning of a word
+     * You need to implement this
      */
     private void updateMeaning(String word, String existingMeaning, String newMeaning) {
         if (word.trim().isEmpty() || existingMeaning.trim().isEmpty() || newMeaning.trim().isEmpty()) {
@@ -377,6 +382,7 @@ public class DictionaryClientGUI extends JFrame {
 
     /**
      * Update connection status
+     * You should call this method when connection status changes
      */
     public void setConnectionStatus(final boolean connected) {
         this.isConnected = connected;
@@ -400,7 +406,8 @@ public class DictionaryClientGUI extends JFrame {
     }
 
     /**
-     * Main method
+     * Main method for testing GUI
+     * You should modify this to include command line argument parsing
      */
     public static void main(String[] args) {
         if (args.length < 3) {
@@ -418,7 +425,7 @@ public class DictionaryClientGUI extends JFrame {
                 try {
                     UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
                 } catch (Exception e) {
-                    // Default
+                    // Will use default look and feel
                 }
 
                 DictionaryClientGUI gui = new DictionaryClientGUI(address, portNum, sleep);

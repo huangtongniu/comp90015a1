@@ -6,7 +6,6 @@ import java.time.LocalTime;
 
 /**
  * Graphical User Interface for the Dictionary Server.
- * Implements ServerListener to receive updates from the core logic.
  */
 public class DictionaryServerGUI extends JFrame implements ServerListener {
     private DictionaryServer serverCore;
@@ -16,6 +15,7 @@ public class DictionaryServerGUI extends JFrame implements ServerListener {
     private JButton startStopButton;
 
     public DictionaryServerGUI(int port, String dictionaryFile) {
+        // Initialize core logic
         this.serverCore = new DictionaryServer(port, dictionaryFile);
         this.serverCore.setListener(this);
         
@@ -41,6 +41,7 @@ public class DictionaryServerGUI extends JFrame implements ServerListener {
         logArea.setEditable(false);
         add(new JScrollPane(logArea), BorderLayout.CENTER);
 
+        // Setup button listener
         startStopButton.addActionListener(e -> {
             if (serverCore.isRunning()) {
                 serverCore.stop();
@@ -53,31 +54,29 @@ public class DictionaryServerGUI extends JFrame implements ServerListener {
         setVisible(true);
     }
 
-    @Override
+
+    // --- Implementation of ServerListener ---
     public void onLog(String message) {
+        // Renamed from printLog for clarity, but does the same thing
         SwingUtilities.invokeLater(() -> {
             logArea.append(LocalTime.now() + " - " + message + "\n");
             logArea.setCaretPosition(logArea.getDocument().getLength());
         });
     }
 
-    @Override
     public void onConnectionCountChanged(int count) {
         SwingUtilities.invokeLater(() -> connectionsLabel.setText("Active Connections: " + count));
     }
-
-    @Override
     public void onServerStatusChanged(boolean running) {
         SwingUtilities.invokeLater(() -> {
             startStopButton.setText(running ? "Stop Server" : "Start Server");
-            if (running) {
-                onLog("UI: Server is now online.");
-            } else {
-                onLog("UI: Server is now offline.");
-            }
+            onLog("UI Notice: Server is now " + (running ? "ONLINE" : "OFFLINE"));
         });
     }
 
+    /**
+     * Main entry point for the Server with GUI.
+     */
     public static void main(String[] args) {
         if (args.length < 2) {
             System.out.println("Usage: java server.DictionaryServerGUI <port> <dictionary-file>");
@@ -88,7 +87,7 @@ public class DictionaryServerGUI extends JFrame implements ServerListener {
             int port = Integer.parseInt(args[0]);
             String dictionaryFile = args[1];
             
-            // Set look and feel
+            // Set system look and feel
             try {
                 UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
             } catch (Exception e) {}

@@ -121,6 +121,7 @@ storage：包含 DictionaryManager.java，负责字典数据的持久化（dic.t
   - 服务端：新增了 GUI 界面，可显示实时日志、活跃连接数，并提供手动“启动/停止”按钮。
   - 客户端：保留了原有的 DictionaryClientGUI 结构，并集成了 Socket 通信逻辑。
 
+实现了“主线程监听，线程池处理”的标准模式。它能让你的服务器在维持 GUI 响应的同时，通过 CachedThreadPool 同时应对多个客户端的并发请求。
   
 
 ### 启动参数支持
@@ -156,3 +157,36 @@ f:/distribute/Project1/Dictionary/
 运行服务端： java -cp out server.DictionaryServer 3005 dic.txt
 运行客户端： java -cp out client.DictionaryClientGUI localhost 3005 1000 (1000ms 为模拟延迟时间)
 我已经清理了旧的碎片文件夹（如 DictionaryClient, DictionaryServer, src 等），并将编译产物统一存放在 out 目录中，现在的结构整洁且完全符合实验要求。
+
+
+
+
+
+
+1. Listener 的运行逻辑：
+你可以把它想象成**“电台广播”**的工作流程：
+
+定义协议 (ServerListener)：这就像电台制定的广播标准（比如一定要讲中文，一定要在 100.1 频道讲）。它规定了服务器**“能说什么”**（比如日志消息、连接数、状态变化）。
+注册听众 (setListener)：在启动时，GUI 告诉 Server：“我是你的听众，有消息请按协议调用的我方法”。
+发布消息 (printLog)：当服务器发生事情时（比如有人连进来了），它不再亲自去改界面上的图标，而是直接对着“麦克风”喊一声：listener.onLog("有人来了")。
+接收处理 (onLog)：GUI 收到这个“广播”后，根据自己的需求（更新 JTextArea）去执行操作。
+
+
+(1) 彻底解耦 (Decoupling)
+这是最重要的优点。以前的 DictionaryServer 必须知道 logArea 的存在，如果这个文本框改名了或删除了，服务器代码就会崩溃。
+
+现在：服务器代码里一行 Swing 代码都没有。这意味着服务器逻辑完全独立，它不关心外界有没有界面。
+(2) 支持“无界面模式” (Headless Mode)
+如果你要把这个服务器部署到云端服务器上（通常没有显示器，只有命令行）：
+
+重构前：你根本运行不了，因为服务器会试图创建一个窗口，结果找不到显卡驱动而报错。
+重构后：你可以直接运行 DictionaryServer。如果没有设置 Listener，它会自动把日志打印到黑窗口（Console）里，照样跑得很欢。
+(3) 维护成本低
+假设你明年想大改界面，把 Swing 换成更现代的 JavaFX。
+
+以前：你需要把整个 DictionaryServer 的代码翻个底朝天，把所有 Swing 的变量都改掉。
+现在：你只需要写一个新的 DictionaryServerFX 并实现 ServerListener 接口即可，核心逻辑文件一行都不用动。
+(4) 方便测试
+如果你想写一个自动化脚本测试服务器性能，你可以只运行逻辑类，而不必每次测试都弹出一个干扰视线的窗口。
+
+总结： 这种设计让你的代码从**“一团乱麻”变成了“插拔式组件”**。DictionaryServer 是核心引擎，DictionaryServerGUI 是一个漂亮的外壳，而 ServerListener 就是连接它们的标准接口。只要接口对得上，你可以随时更换外壳。

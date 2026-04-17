@@ -1,10 +1,7 @@
 {
     "java.project.outputPath": "out",
     "java.project.sourcePaths": [
-        "client",
-        "server",
-        "protocol",
-        "storage"
+        "." 
     ],
     "java.compile.nullAnalysis.mode": "automatic",
     "files.encoding": "UTF8"

@@ -11,23 +11,22 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
- * Core logic for the Dictionary Server.
- * Handles networking and provides hooks for UI listeners.
+ * Dictionary Server Core Logic.
+ * This class is independent of any GUI implementation.
  */
 public class DictionaryServer {
     private int port;
-    private String dictionaryFile;
     private DictionaryManager manager;
     private ServerSocket serverSocket;
     private boolean isRunning = false;
     private ExecutorService executorService;
     private AtomicInteger activeConnections = new AtomicInteger(0);
     
+    // The listener that will receive updates (e.g., the GUI)
     private ServerListener listener;
 
     public DictionaryServer(int port, String dictionaryFile) {
         this.port = port;
-        this.dictionaryFile = dictionaryFile;
         this.manager = new DictionaryManager(dictionaryFile);
     }
 
@@ -35,7 +34,7 @@ public class DictionaryServer {
         this.listener = listener;
     }
 
-    public void start() {
+    public synchronized void start() {
         if (isRunning) return;
         
         executorService = Executors.newCachedThreadPool();
@@ -45,7 +44,7 @@ public class DictionaryServer {
         new Thread(() -> {
             try {
                 serverSocket = new ServerSocket(port);
-                log("Server started on port " + port);
+                printLog("Server started on port " + port);
                 while (isRunning) {
                     try {
                         Socket clientSocket = serverSocket.accept();
@@ -53,27 +52,29 @@ public class DictionaryServer {
                         notifyConnectionCount();
                         executorService.execute(() -> handleClient(clientSocket));
                     } catch (IOException e) {
-                        if (isRunning) log("Error accepting connection: " + e.getMessage());
+                        if (isRunning) printLog("Error accepting connection: " + e.getMessage());
                     }
                 }
             } catch (IOException e) {
-                log("Could not listen on port " + port);
-                isRunning = false;
-                notifyServerStatus(false);
+                if (isRunning) {
+                    printLog("Could not listen on port " + port + ": " + e.getMessage());
+                    isRunning = false;
+                    notifyServerStatus(false);
+                }
             }
         }).start();
     }
 
-    public void stop() {
+    public synchronized void stop() {
         if (!isRunning) return;
         
         isRunning = false;
         try {
             if (serverSocket != null) serverSocket.close();
             if (executorService != null) executorService.shutdownNow();
-            log("Server stopped.");
+            printLog("Server stopped.");
         } catch (IOException e) {
-            log("Error stopping server: " + e.getMessage());
+            printLog("Error stopping server: " + e.getMessage());
         }
         activeConnections.set(0);
         notifyConnectionCount();
@@ -86,7 +87,7 @@ public class DictionaryServer {
 
     private void handleClient(Socket socket) {
         String clientInfo = socket.getInetAddress().getHostAddress() + ":" + socket.getPort();
-        log("New connection from " + clientInfo);
+        printLog("New connection from " + clientInfo);
 
         try (ObjectInputStream in = new ObjectInputStream(socket.getInputStream());
              ObjectOutputStream out = new ObjectOutputStream(socket.getOutputStream())) {
@@ -95,10 +96,10 @@ public class DictionaryServer {
             while (isRunning && (input = in.readObject()) != null) {
                 if (input instanceof Message) {
                     Message request = (Message) input;
-                    log("Received " + request.getOperation() + " from " + clientInfo + " (Word: " + request.getWord() + ")");
+                    printLog("Received " + request.getOperation() + " from " + clientInfo + " (Word: " + request.getWord() + ")");
                     
                     if (request.getSleepDuration() > 0) {
-                        log("Simulating delay: " + request.getSleepDuration() + "ms");
+                        printLog("Simulating delay: " + request.getSleepDuration() + "ms");
                         Thread.sleep(request.getSleepDuration());
                     }
 
@@ -108,9 +109,9 @@ public class DictionaryServer {
                 }
             }
         } catch (EOFException e) {
-            log("Client " + clientInfo + " disconnected.");
+            printLog("Client " + clientInfo + " disconnected.");
         } catch (Exception e) {
-            log("Error handling client " + clientInfo + ": " + e.getMessage());
+            printLog("Error handling client " + clientInfo + ": " + e.getMessage());
         } finally {
             try {
                 socket.close();
@@ -168,7 +169,7 @@ public class DictionaryServer {
         return response;
     }
 
-    private void log(String message) {
+    private void printLog(String message) {
         if (listener != null) {
             listener.onLog(message);
         } else {
@@ -185,25 +186,6 @@ public class DictionaryServer {
     private void notifyServerStatus(boolean running) {
         if (listener != null) {
             listener.onServerStatusChanged(running);
-        }
-    }
-
-    /**
-     * Entry point to run the server in headless mode (Console only).
-     */
-    public static void main(String[] args) {
-        if (args.length < 2) {
-            System.out.println("Usage: java server.DictionaryServer <port> <dictionary-file>");
-            return;
-        }
-        try {
-            int port = Integer.parseInt(args[0]);
-            String dictionaryFile = args[1];
-            DictionaryServer server = new DictionaryServer(port, dictionaryFile);
-            server.start();
-            System.out.println("Server running in console mode. Press Ctrl+C to stop.");
-        } catch (NumberFormatException e) {
-            System.out.println("Error: Port must be a number.");
         }
     }
 }
