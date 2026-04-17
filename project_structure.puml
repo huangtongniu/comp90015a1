@@ -1,0 +1,79 @@
+@startuml
+skinparam classAttributeIconSize 0
+
+package "protocol" {
+    class Message <<Serializable>> {
+        + word: String
+        + meanings: List<String>
+        + operation: Operation
+        + success: boolean
+        --
+        + {static} query(word, delay): Message
+        + {static} add(word, meanings, delay): Message
+        ...
+    }
+    enum Operation {
+        QUERY, ADD, REMOVE, ...
+    }
+}
+
+package "storage" {
+    class DictionaryManager {
+        - dictionary: Map<String, List<String>>
+        - lock: ReadWriteLock
+        - filePath: String
+        --
+        + query(word): List<String>
+        + addWord(word, meanings): String
+        + saveToFile(): void
+        ...
+    }
+}
+
+package "server" {
+    interface ServerListener {
+        + onLog(message: String): void
+        + onConnectionCountChanged(count: int): void
+        + onServerStatusChanged(running: boolean): void
+    }
+
+    class DictionaryServer {
+        - manager: DictionaryManager
+        - listener: ServerListener
+        - clientSockets: List<Socket>
+        --
+        + start(): void
+        + stop(): void
+        - handleClient(socket: Socket): void
+    }
+
+    class DictionaryServerGUI {
+        - serverCore: DictionaryServer
+        --
+        + main(args: String[]): void
+    }
+}
+
+package "client" {
+    class DictionaryClientGUI {
+        - socket: Socket
+        - out: ObjectOutputStream
+        - in: ObjectInputStream
+        --
+        - connectToServer(): void
+        - startReceiverThread(): void
+        - sendMessage(msg: Message): void
+        + main(args: String[]): void
+    }
+}
+
+' Relationships
+Message +-- Operation
+DictionaryServer o-- DictionaryManager
+DictionaryServer o-- ServerListener
+DictionaryServerGUI ..|> ServerListener
+DictionaryServerGUI o-- DictionaryServer
+DictionaryClientGUI ..> Message : sends/receives
+DictionaryServer ..> Message : processes
+
+@enduml

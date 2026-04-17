@@ -6,6 +6,9 @@ import storage.DictionaryManager;
 import java.io.*;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -21,8 +24,7 @@ public class DictionaryServer {
     private boolean isRunning = false;
     private ExecutorService executorService;
     private AtomicInteger activeConnections = new AtomicInteger(0);
-    
-    // The listener that will receive updates (e.g., the GUI)
+    private final List<Socket> clientSockets = Collections.synchronizedList(new ArrayList<>()); // listen to client sockets
     private ServerListener listener;
 
     public DictionaryServer(int port, String dictionaryFile) {
@@ -48,6 +50,7 @@ public class DictionaryServer {
                 while (isRunning) {
                     try {
                         Socket clientSocket = serverSocket.accept();
+                        clientSockets.add(clientSocket); // Track the socket
                         activeConnections.incrementAndGet();
                         notifyConnectionCount();
                         executorService.execute(() -> handleClient(clientSocket));
@@ -71,8 +74,20 @@ public class DictionaryServer {
         isRunning = false;
         try {
             if (serverSocket != null) serverSocket.close();
+
             if (executorService != null) executorService.shutdownNow();
-            printLog("Server stopped.");
+            synchronized (clientSockets) {
+                for (Socket s : clientSockets) {
+                    try {
+                        if (!s.isClosed()) s.close();
+                    } catch (IOException e) {
+                        // Ignore
+                    }
+                }
+                clientSockets.clear();
+            }
+
+            printLog("Server stopped and all clients disconnected.");
         } catch (IOException e) {
             printLog("Error stopping server: " + e.getMessage());
         }
@@ -106,6 +121,7 @@ public class DictionaryServer {
                     Message response = processRequest(request);
                     out.writeObject(response);
                     out.flush();
+                    out.reset(); // Clear handle table to prevent memory leaks and caching issues
                 }
             }
         } catch (EOFException e) {
@@ -114,10 +130,11 @@ public class DictionaryServer {
             printLog("Error handling client " + clientInfo + ": " + e.getMessage());
         } finally {
             try {
-                socket.close();
+                if (!socket.isClosed()) socket.close();
             } catch (IOException e) {
                 // Ignore
             }
+            clientSockets.remove(socket); // Remove from tracking list
             activeConnections.decrementAndGet();
             notifyConnectionCount();
         }

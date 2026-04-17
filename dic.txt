@@ -8,7 +8,6 @@ lol : a game
 iii : iausfkshdf
 kkk : sdsdfsdf
 ytyt : opop
-soaame : opop
 uulo : ssss
 hous : pppppp
 hout : pppppp
@@ -16,10 +15,10 @@ yyy : pppasd
 dfsello : ssss
 chychy : ppp
 edc : dddddd
-yes : one statement of ok
+yes : one|two|1|2
 hgyy : opopop
 npp : sdsdfsdf
 qwert : keyborad
 helloa : ggggasd
-opop : ppplasd
 hello : sayhi123|RE1|good|RE
+word : 23|4321|321|1234|5

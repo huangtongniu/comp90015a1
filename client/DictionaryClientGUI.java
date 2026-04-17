@@ -251,6 +251,9 @@ public class DictionaryClientGUI extends JFrame {
                     in = new ObjectInputStream(socket.getInputStream());
                     setConnectionStatus(true);
                     displayResult("Connected to " + serverAddress + ":" + port);
+
+                    startReceiverThread();
+
                 } catch (IOException e) {
                     setConnectionStatus(false);
                     displayResult("Error: Could not connect to server - " + e.getMessage());
@@ -260,31 +263,65 @@ public class DictionaryClientGUI extends JFrame {
     }
 
     /**
-     * Shared method to send messages to the server
+     * Background thread that continuously listens for data from the server.
+     * This allows the client to detect disconnection immediately.
+     */
+    private void startReceiverThread() {
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    while (isConnected) {
+                        final Message response = (Message) in.readObject();
+                        if (response == null) break;
+
+                        SwingUtilities.invokeLater(new Runnable() {
+                            @Override
+                            public void run() {
+                                handleResponse(response);
+                            }
+                        });
+                    }
+                } catch (Exception e) {
+                    // Logic for handling server disconnection
+                    SwingUtilities.invokeLater(new Runnable() {
+                        @Override
+                        public void run() {
+                            if (isConnected) {
+                                setConnectionStatus(false);
+                                displayResult("Notification: Server connection has been closed.");
+                            }
+                        }
+                    });
+                }
+            }
+        }).start();
+    }
+
+    // Synchronization lock to ensure thread safety for socket writing
+    private final Object streamLock = new Object();
+
+    /**
+     * Shared method to send messages to the server (Asynchronous Send)
      */
     private void sendMessage(final Message msg) {
-        if (socket == null || socket.isClosed()) {
+        if (socket == null || socket.isClosed() || !isConnected) {
             displayResult("Error: Not connected to server.");
             return;
         }
         new Thread(new Runnable() {
             @Override
             public void run() {
-                try {
-                    out.writeObject(msg);
-                    out.flush();
-                    final Message response = (Message) in.readObject();
-                    
-                    // Update UI on Event Dispatch Thread
-                    SwingUtilities.invokeLater(new Runnable() {
-                        @Override
-                        public void run() {
-                            handleResponse(response);
-                        }
-                    });
-                } catch (IOException | ClassNotFoundException e) {
-                    displayResult("Error: Communication failure - " + e.getMessage());
-                    setConnectionStatus(false);
+                synchronized (streamLock) {
+                    try {
+                        out.writeObject(msg);
+                        out.flush();
+                        out.reset();
+                        // Responses are handled by the startReceiverThread background loop
+                    } catch (IOException e) {
+                        displayResult("Error: Failed to send data to server.");
+                        setConnectionStatus(false);
+                    }
                 }
             }
         }).start();
