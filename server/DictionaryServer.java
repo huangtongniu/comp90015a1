@@ -3,8 +3,6 @@ package server;
 import protocol.Message;
 import storage.DictionaryManager;
 
-import javax.swing.*;
-import java.awt.*;
 import java.io.*;
 import java.net.ServerSocket;
 import java.net.Socket;
@@ -12,7 +10,11 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicInteger;
 
-public class DictionaryServer extends JFrame {
+/**
+ * Core logic for the Dictionary Server.
+ * Handles networking and provides hooks for UI listeners.
+ */
+public class DictionaryServer {
     private int port;
     private String dictionaryFile;
     private DictionaryManager manager;
@@ -20,53 +22,25 @@ public class DictionaryServer extends JFrame {
     private boolean isRunning = false;
     private ExecutorService executorService;
     private AtomicInteger activeConnections = new AtomicInteger(0);
-
-    // GUI Components
-    private JTextArea logArea;
-    private JLabel connectionsLabel;
-    private JButton startStopButton;
+    
+    private ServerListener listener;
 
     public DictionaryServer(int port, String dictionaryFile) {
         this.port = port;
         this.dictionaryFile = dictionaryFile;
         this.manager = new DictionaryManager(dictionaryFile);
-        initializeGUI();
     }
 
-    private void initializeGUI() {
-        setTitle("Dictionary Server - Port: " + port);
-        setSize(500, 400);
-        setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-        setLayout(new BorderLayout());
-
-        // Control Panel
-        JPanel controlPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
-        startStopButton = new JButton("Start Server");
-        connectionsLabel = new JLabel("Active Connections: 0");
-        controlPanel.add(startStopButton);
-        controlPanel.add(connectionsLabel);
-        add(controlPanel, BorderLayout.NORTH);
-
-        // Log Panel
-        logArea = new JTextArea();
-        logArea.setEditable(false);
-        add(new JScrollPane(logArea), BorderLayout.CENTER);
-
-        startStopButton.addActionListener(e -> {
-            if (isRunning) {
-                stopServer();
-            } else {
-                startServer();
-            }
-        });
-
-        setVisible(true);
+    public void setListener(ServerListener listener) {
+        this.listener = listener;
     }
 
-    private void startServer() {
-        isRunning = true;
-        startStopButton.setText("Stop Server");
+    public void start() {
+        if (isRunning) return;
+        
         executorService = Executors.newCachedThreadPool();
+        isRunning = true;
+        notifyServerStatus(true);
         
         new Thread(() -> {
             try {
@@ -76,7 +50,7 @@ public class DictionaryServer extends JFrame {
                     try {
                         Socket clientSocket = serverSocket.accept();
                         activeConnections.incrementAndGet();
-                        updateConnectionsLabel();
+                        notifyConnectionCount();
                         executorService.execute(() -> handleClient(clientSocket));
                     } catch (IOException e) {
                         if (isRunning) log("Error accepting connection: " + e.getMessage());
@@ -84,13 +58,16 @@ public class DictionaryServer extends JFrame {
                 }
             } catch (IOException e) {
                 log("Could not listen on port " + port);
+                isRunning = false;
+                notifyServerStatus(false);
             }
         }).start();
     }
 
-    private void stopServer() {
+    public void stop() {
+        if (!isRunning) return;
+        
         isRunning = false;
-        startStopButton.setText("Start Server");
         try {
             if (serverSocket != null) serverSocket.close();
             if (executorService != null) executorService.shutdownNow();
@@ -99,7 +76,12 @@ public class DictionaryServer extends JFrame {
             log("Error stopping server: " + e.getMessage());
         }
         activeConnections.set(0);
-        updateConnectionsLabel();
+        notifyConnectionCount();
+        notifyServerStatus(false);
+    }
+
+    public boolean isRunning() {
+        return isRunning;
     }
 
     private void handleClient(Socket socket) {
@@ -115,7 +97,6 @@ public class DictionaryServer extends JFrame {
                     Message request = (Message) input;
                     log("Received " + request.getOperation() + " from " + clientInfo + " (Word: " + request.getWord() + ")");
                     
-                    // Simulate delay
                     if (request.getSleepDuration() > 0) {
                         log("Simulating delay: " + request.getSleepDuration() + "ms");
                         Thread.sleep(request.getSleepDuration());
@@ -137,7 +118,7 @@ public class DictionaryServer extends JFrame {
                 // Ignore
             }
             activeConnections.decrementAndGet();
-            updateConnectionsLabel();
+            notifyConnectionCount();
         }
     }
 
@@ -188,25 +169,39 @@ public class DictionaryServer extends JFrame {
     }
 
     private void log(String message) {
-        SwingUtilities.invokeLater(() -> {
-            logArea.append(java.time.LocalTime.now() + " - " + message + "\n");
-            logArea.setCaretPosition(logArea.getDocument().getLength());
-        });
+        if (listener != null) {
+            listener.onLog(message);
+        } else {
+            System.out.println(java.time.LocalTime.now() + " - " + message);
+        }
     }
 
-    private void updateConnectionsLabel() {
-        SwingUtilities.invokeLater(() -> connectionsLabel.setText("Active Connections: " + activeConnections.get()));
+    private void notifyConnectionCount() {
+        if (listener != null) {
+            listener.onConnectionCountChanged(activeConnections.get());
+        }
     }
 
+    private void notifyServerStatus(boolean running) {
+        if (listener != null) {
+            listener.onServerStatusChanged(running);
+        }
+    }
+
+    /**
+     * Entry point to run the server in headless mode (Console only).
+     */
     public static void main(String[] args) {
         if (args.length < 2) {
-            System.out.println("Usage: java DictionaryServer <port> <dictionary-file>");
+            System.out.println("Usage: java server.DictionaryServer <port> <dictionary-file>");
             return;
         }
         try {
             int port = Integer.parseInt(args[0]);
             String dictionaryFile = args[1];
-            new DictionaryServer(port, dictionaryFile);
+            DictionaryServer server = new DictionaryServer(port, dictionaryFile);
+            server.start();
+            System.out.println("Server running in console mode. Press Ctrl+C to stop.");
         } catch (NumberFormatException e) {
             System.out.println("Error: Port must be a number.");
         }
